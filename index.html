@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>颱風修復進度表 - 丹娜絲(斗六)</title>
+    
+    <!-- Preload critical resources -->
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" as="style">
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    
+    <!-- CSS Dependencies -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    
+    <style>
+        :root {
+            --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            --bg-gradient: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            --shadow-light: 0 4px 15px rgba(0,0,0,0.1);
+            --shadow-medium: 0 8px 25px rgba(0,0,0,0.15);
+            --shadow-heavy: 0 20px 40px rgba(0,0,0,0.1);
+            --border-radius: 12px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            --success: #28a745;
+            --warning: #ffc107;
+            --danger: #dc3545;
+            --secondary: #6c757d;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Noto Sans TC', 'Microsoft JhengHei', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: var(--bg-gradient);
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container-fluid {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: var(--shadow-heavy);
+            overflow: hidden;
+            padding: 0;
+        }
+
+        .header {
+            background: var(--primary-gradient);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/><circle cx="30" cy="30" r="20" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="0.5"/></svg>');
+            opacity: 0.3;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: clamp(1.8rem, 4vw, 2.5rem);
+            font-weight: 300;
+            position: relative;
+            z-index: 1;
+        }
+
+        .header-subtitle {
+            margin-top: 10px;
+            font-size: 1.1rem;
+            opacity: 0.9;
+            position: relative;
+            z-index: 1;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 25px;
+            padding: 40px 30px;
+            background: #f8f9fa;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 30px 25px;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-light);
+            text-align: center;
+            transition: var(--transition);
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            border-left: 4px solid transparent;
+        }
+
+        .stat-card:hover { 
+            transform: translateY(-8px) scale(1.02); 
+            box-shadow: var(--shadow-medium);
+        }
+
+        .stat-card.active {
+            border-left-color: var(--primary-gradient);
+            background: linear-gradient(145deg, #ffffff 0%, #f8f9ff 100%);
+        }
+
+        .stat-number { 
+            font-size: 3rem; 
+            font-weight: 700; 
+            margin: 15px 0; 
+            line-height: 1;
+        }
+
+        .stat-label { 
+            color: #666; 
+            font-size: 1.1rem; 
+            font-weight: 500;
+        }
+
+        .stat-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+            opacity: 0.7;
+        }
+
+        .completed { color: var(--success); }
+        .in-progress { color: var(--warning); }
+        .cancelled { color: var(--danger); }
+        .total { color: var(--secondary); }
+
+        .chart-section {
+            padding: 40px 30px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 40px;
+        }
+
+        .chart-container { 
+            height: 400px; 
+            position: relative;
+            background: white;
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-light);
+            padding: 20px;
+        }
+
+        #map { 
+            height: 600px; 
+            border-radius: var(--border-radius); 
+            box-shadow: var(--shadow-light); 
+            margin: 30px;
+            position: relative;
+        }
+
+        .map-controls {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .map-control-item {
+            background: white;
+            border-radius: 8px;
+            box-shadow: var(--shadow-light);
+            padding: 10px;
+            min-width: 250px;
+        }
+
+        /* 優化即時統計控制項 */
+        .map-stats-control {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 8px;
+            box-shadow: var(--shadow-light);
+            padding: 8px;
+            min-width: 200px;
+            max-width: 250px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .stats-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 6px;
+            transition: var(--transition);
+        }
+
+        .stats-header:hover {
+            background: rgba(102, 126, 234, 0.1);
+        }
+
+        .stats-toggle {
+            background: none;
+            border: none;
+            font-size: 1.2rem;
+            color: #667eea;
+            cursor: pointer;
+            padding: 0;
+            line-height: 1;
+            transition: var(--transition);
+        }
+
+        .stats-content {
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid rgba(0, 0, 0, 0.1);
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            font-size: 0.85rem;
+            transition: var(--transition);
+            overflow: hidden;
+        }
+
+        .stats-content.collapsed {
+            max-height: 0;
+            padding-top: 0;
+            margin-top: 0;
+            border-top: none;
+            opacity: 0;
+        }
+
+        .stats-content.expanded {
+            max-height: 200px;
+            opacity: 1;
+        }
+
+        .stats-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 2px 4px;
+            border-radius: 4px;
+            background: rgba(248, 249, 250, 0.8);
+        }
+
+        .table-responsive { 
+            padding: 30px; 
+            background: white;
+        }
+
+        .table-wrapper {
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow-light);
+            overflow: hidden;
+        }
+
+        thead input {
+            width: 100%;
+            padding: 0.5rem 0.75rem;
+            font-size: 0.9rem;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            transition: var(--transition);
+        }
+
+        thead input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+        }
+
+        .table {
+            border-radius: var(--border-radius);
+            overflow: hidden;
+        }
+
+        .table th {
+            /* background: var(--primary-gradient); */
+            color: white;
+            font-weight: 500;
+            border: none;
+            padding: 1rem 0.75rem;
+        }
+
+        .table td {
+            padding: 0.875rem 0.75rem;
+            vertical-align: middle;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .table tbody tr:hover {
+            background-color: #f8f9ff;
+            transition: var(--transition);
+        }
+
+        .loading-spinner {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+            font-size: 1.2rem;
+            color: #666;
+        }
+
+        .loading-spinner::before {
+            content: '';
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background: linear-gradient(135deg, #ff6b6b, #ff8e8e);
+            color: white;
+            padding: 20px;
+            border-radius: var(--border-radius);
+            margin: 20px;
+            text-align: center;
+        }
+
+        .footer {
+            background: #f8f9fa;
+            color: #666;
+            text-align: center;
+            padding: 30px;
+            border-top: 1px solid #e0e0e0;
+        }
+
+        .progress-indicator {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            transform: scaleX(0);
+            transform-origin: left;
+            transition: transform 0.3s ease;
+            z-index: 9999;
+        }
+
+        .progress-indicator.loading {
+            animation: progressLoad 2s ease-in-out infinite;
+        }
+
+        @keyframes progressLoad {
+            0% { transform: scaleX(0); }
+            50% { transform: scaleX(0.7); }
+            100% { transform: scaleX(1); }
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            body { padding: 10px; }
+            .stats-grid { grid-template-columns: 1fr; padding: 20px; }
+            .chart-section { grid-template-columns: 1fr; padding: 20px; }
+            #map { margin: 20px 10px; height: 400px; }
+            .table-responsive { padding: 15px; }
+            .header { padding: 25px 20px; }
+            
+            .map-control-item,
+            .map-stats-control {
+                min-width: 200px;
+                font-size: 0.9rem;
+            }
+        }
+
+        /* Dark mode support */
+        @media (prefers-color-scheme: dark) {
+            body { 
+                background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+                color: #ecf0f1;
+            }
+            .container-fluid { background: #34495e; }
+            .stat-card { background: #3a4a5c; color: #ecf0f1; }
+            .chart-container { background: #3a4a5c; }
+            .table { background: #3a4a5c; }
+            .table td { border-bottom-color: #4a5a6c; }
+            .map-stats-control { background: rgba(58, 74, 92, 0.95); }
+            .stats-item { background: rgba(68, 84, 102, 0.8); }
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #c1c1c1;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #a8a8a8;
+        }
+
+        .leaflet-popup-content {
+            margin: 15px 20px;
+            line-height: 1.5;
+        }
+
+        .leaflet-popup-content hr {
+            margin: 8px 0;
+            border: none;
+            border-top: 1px solid #eee;
+        }
+
+        .leaflet-popup-content a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .leaflet-popup-content a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="progress-indicator" id="progressIndicator"></div>
+    
+    <div class="container-fluid">
+        <div class="header">
+            <h1>🌪️ 丹娜絲颱風復舊工程進度報告</h1>
+            <div class="header-subtitle">即時監控 · 數據分析 · 進度追蹤</div>
+        </div>
+
+        <div id="loadingSection" class="loading-spinner" style="display: none;">
+            正在載入資料...
+        </div>
+
+        <div id="mainContent" style="display: none;">
+            <div class="stats-grid">
+                <div id="card-total" class="stat-card" data-filter="all">
+                    <div class="stat-icon total"><i class="bi bi-list-ul"></i></div>
+                    <div id="total-cases" class="stat-number total">0</div>
+                    <div class="stat-label">總案件數</div>
+                </div>
+                <div id="card-completed" class="stat-card" data-filter="完成">
+                    <div class="stat-icon completed"><i class="bi bi-check-circle"></i></div>
+                    <div id="completed-cases" class="stat-number completed">0</div>
+                    <div class="stat-label">已完工</div>
+                </div>
+                <div id="card-in-progress" class="stat-card" data-filter="進行中">
+                    <div class="stat-icon in-progress"><i class="bi bi-clock"></i></div>
+                    <div id="in-progress-cases" class="stat-number in-progress">0</div>
+                    <div class="stat-label">進行中</div>
+                </div>
+                <div id="card-cancelled" class="stat-card" data-filter="自辦/轉辦">
+                    <div class="stat-icon cancelled"><i class="bi bi-x-circle"></i></div>
+                    <div id="cancelled-cases" class="stat-number cancelled">0</div>
+                    <div class="stat-label">自辦/轉辦</div>
+                </div>
+            </div>
+
+            <div class="chart-section">
+                <div class="chart-container">
+                    <canvas id="progressChart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <canvas id="locationChart"></canvas>
+                </div>
+            </div>
+
+            <div style="position: relative;">
+                <div id="map"></div>
+            </div>
+
+            <div class="table-responsive">
+                <div class="table-wrapper">
+                    <table id="progressTable" class="table table-hover">
+                        <thead class="table-dark">
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <footer class="footer">
+            <p><i class="bi bi-calendar3"></i> 報告生成時間：<span id="reportTime"></span></p>
+            <p><i class="bi bi-info-circle"></i> 資料來源：Google Sheets API | 地圖服務：OpenStreetMap</p>
+        </footer>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.11.0/proj4.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+
+    <script>
+    class TyphoonDashboard {
+        constructor() {
+            this.API_KEY = 'AIzaSyA8Ok4r6-w8Ggii57gjPafEROlninDL6sg';
+            this.SPREADSHEET_ID = '1Hb0Y74mc3llfdMB45LI2tswctNv8NcZVR9S111PgNQU';
+            this.RANGE = '斗六!A:V';
+            
+            this.repairData = [];
+            this.markerReferences = [];
+            this.currentMarkersOnMap = [];
+            this.currentStatusFilter = 'all';
+            this.currentSearchTerm = '';
+            this.map = null;
+            this.dataTable = null;
+            this.statsCollapsed = false;
+            
+            this.init();
+        }
+
+        init() {
+            this.showProgress();
+            this.setupEventListeners();
+            this.fetchData();
+            this.updateReportTime();
+        }
+
+        showProgress() {
+            document.getElementById('progressIndicator').classList.add('loading');
+            document.getElementById('loadingSection').style.display = 'flex';
+            document.getElementById('mainContent').style.display = 'none';
+        }
+
+        hideProgress() {
+            document.getElementById('progressIndicator').classList.remove('loading');
+            document.getElementById('loadingSection').style.display = 'none';
+            document.getElementById('mainContent').style.display = 'block';
+        }
+
+        updateReportTime() {
+            const now = new Date();
+            const timeStr = now.toLocaleString('zh-TW', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+            document.getElementById('reportTime').textContent = timeStr;
+        }
+
+        setupEventListeners() {
+            // Stats card click handlers
+            document.querySelectorAll('.stat-card').forEach(card => {
+                card.addEventListener('click', (e) => {
+                    const filter = e.currentTarget.dataset.filter || 'all';
+                    this.filterMap(filter);
+                    this.updateActiveCard(e.currentTarget);
+                });
+            });
+
+            // Keyboard shortcuts
+            document.addEventListener('keydown', (e) => {
+                if (e.ctrlKey || e.metaKey) {
+                    switch(e.key) {
+                        case '1':
+                            e.preventDefault();
+                            this.filterMap('all');
+                            break;
+                        case '2':
+                            e.preventDefault();
+                            this.filterMap('完成');
+                            break;
+                        case '3':
+                            e.preventDefault();
+                            this.filterMap('進行中');
+                            break;
+                        case '4':
+                            e.preventDefault();
+                            this.filterMap('自辦/轉辦');
+                            break;
+                    }
+                }
+            });
+        }
+
+        updateActiveCard(activeCard) {
+            document.querySelectorAll('.stat-card').forEach(card => {
+                card.classList.remove('active');
+            });
+            activeCard.classList.add('active');
+        }
+
+        async fetchData() {
+            try {
+                const apiUrl = `https://sheets.googleapis.com/v4/spreadsheets/${this.SPREADSHEET_ID}/values/${this.RANGE}?key=${this.API_KEY}`;
+                
+                const response = await fetch(apiUrl);
+                
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(`API請求失敗: ${response.status} ${response.statusText}${errorData.error ? ` - ${errorData.error.message}` : ''}`);
+                }
+
+                const data = await response.json();
+                
+                if (!data.values || data.values.length < 2) {
+                    throw new Error("資料表為空或格式不正確");
+                }
+
+                this.processData(data.values);
+                this.hideProgress();
+                
+            } catch (error) {
+                this.handleError(error);
+            }
+        }
+
+        processData(rawData) {
+            const headers = rawData[0].map(h => h ? h.trim() : '');
+            const lines = rawData.slice(1);
+
+            // Header mapping
+            const headerMap = {
+                '#': 'id',
+                '施工地點': 'name',
+                '進度': 'progress',
+                '工作單編號': 'ticket',
+                '類型': 'type',
+                '實績歸列局': 'office',
+                '積點數': 'points',
+                '桿號': 'pole'
+            };
+            
+            const headerIndexes = {};
+            Object.keys(headerMap).forEach(key => {
+                const index = headers.indexOf(key);
+                if (index !== -1) {
+                    headerIndexes[headerMap[key]] = index;
+                }
+            });
+
+            // Process repair data
+            this.repairData = lines.map(line => {
+                let entry = {};
+                for (const key in headerIndexes) {
+                    entry[key] = line[headerIndexes[key]] || '';
+                }
+                entry.type = line[2] || '';
+                
+                // Handle coordinates
+                const lonValue = line[19];
+                const latValue = line[20];
+                entry.lon = lonValue ? parseFloat(lonValue) : null;
+                entry.lat = latValue ? parseFloat(latValue) : null;
+                if (isNaN(entry.lon)) entry.lon = null;
+                if (isNaN(entry.lat)) entry.lat = null;
+                
+                return entry;
+            }).filter(item => item.name); // Filter out empty entries
+
+            this.initializeDashboard(headers, lines);
+        }
+
+        handleError(error) {
+            console.error('Error:', error);
+            
+            let errorMessage = '無法載入資料，請稍後再試。';
+            
+            if (error.message.includes("API key not valid")) {
+                errorMessage = 'Google API 金鑰無效，請檢查您的金鑰設定。';
+            } else if (error.message.includes("not found")) {
+                errorMessage = '找不到指定的 Google Sheet，請檢查您的試算表 ID。';
+            } else if (error.message.includes("Unable to parse range")) {
+                errorMessage = '無法解析指定的範圍，請檢查您的工作表名稱和範圍設定。';
+            }
+
+            document.querySelector('.container-fluid').innerHTML = `
+                <div class="error-message">
+                    <h3><i class="bi bi-exclamation-triangle"></i> 載入失敗</h3>
+                    <p>${errorMessage}</p>
+                    <small>${error.message}</small>
+                    <br><br>
+                    <button class="btn btn-light" onclick="location.reload()">
+                        <i class="bi bi-arrow-clockwise"></i> 重新載入
+                    </button>
+                </div>
+            `;
+        }
+
+        initializeDashboard(headers, lines) {
+            // Setup coordinate projection
+            proj4.defs("EPSG:3826", "+proj=tmerc +lat_0=0 +lon_0=121 +k=0.9999 +x_0=250000 +y_0=0 +ellps=GRS80 +units=m +no_defs");
+
+            // Initialize components
+            this.processStatistics();
+            this.initializeMap();
+            this.initializeCharts();
+            this.initializeTable(headers, lines);
+        }
+
+        convertTWD97ToWGS84(x, y) {
+            if (!x || !y) return null;
+            
+            // Check if coordinates are likely TWD97
+            if (x > 100000 && x < 400000 && y > 2400000 && y < 2800000) {
+                try {
+                    const [lon, lat] = proj4("EPSG:3826", "WGS84", [x, y]);
+                    return { lat: lat, lon: lon };
+                } catch(e) {
+                    console.error("Coordinate conversion failed:", x, y, e);
+                    return null;
+                }
+            }
+            
+            // Assume WGS84 if not TWD97
+            return { lat: y, lon: x };
+        }
+
+        getStatusInfo(progress) {
+            progress = (progress || "").trim();
+            if (progress === '') return { color: '#6c757d', class: 'status-special', label: '其他' };
+            if (progress.includes('OK')) return { color: '#28a745', class: 'status-ok', label: '完成' };
+            if (progress.includes('自辦')) return { color: '#dc3545', class: 'status-cancelled', label: '自辦/轉辦' };
+            return { color: '#ffc107', class: 'status-in-progress', label: '進行中' };
+        }
+
+        processStatistics() {
+            const statusCounts = { '完成': 0, '進行中': 0, '自辦/轉辦': 0, '其他': 0 };
+            const locationCounts = {};
+
+            this.repairData.forEach(item => {
+                const statusInfo = this.getStatusInfo(item.progress);
+                statusCounts[statusInfo.label]++;
+
+                // Determine location
+                let locationName = "其他地區";
+                if (item.name) {
+                    if (item.name.includes('古坑')) locationName = '古坑鄉';
+                    else if (item.name.includes('斗南')) locationName = '斗南鎮';
+                    else if (item.name.includes('斗六')) locationName = '斗六市';
+                    else if (item.name.includes('西螺')) locationName = '西螺鎮';
+                }
+                locationCounts[locationName] = (locationCounts[locationName] || 0) + 1;
+            });
+
+            // Update UI
+            document.getElementById('total-cases').textContent = this.repairData.length;
+            document.getElementById('completed-cases').textContent = statusCounts['完成'];
+            document.getElementById('in-progress-cases').textContent = statusCounts['進行中'];
+            document.getElementById('cancelled-cases').textContent = statusCounts['自辦/轉辦'];
+
+            this.statusCounts = statusCounts;
+            this.locationCounts = locationCounts;
+        }
+
+        initializeMap() {
+            this.map = L.map('map', { maxZoom: 20 }).setView([23.63, 120.58], 11);
+
+            // Base layers
+            const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 19
+            }).addTo(this.map);
+
+            const esriSatellite = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                attribution: '© Esri',
+                maxZoom: 19
+            });
+
+            const cartoTerrain = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png', {
+                attribution: '© CARTO',
+                maxZoom: 19
+            });
+
+            const baseLayers = {
+                "標準地圖": osmLayer,
+                "衛星影像": esriSatellite,
+                "簡潔地圖": cartoTerrain
+            };
+
+            L.control.layers(baseLayers).addTo(this.map);
+
+            // Add markers
+            this.addMapMarkers();
+            this.addMapControls();
+        }
+
+        addMapMarkers() {
+            this.repairData.forEach(item => {
+                const statusInfo = this.getStatusInfo(item.progress);
+                const coords = this.convertTWD97ToWGS84(item.lon, item.lat);
+
+                if (coords && !isNaN(coords.lat) && !isNaN(coords.lon)) {
+                    const marker = L.circleMarker([coords.lat, coords.lon], {
+                        radius: 8,
+                        fillColor: statusInfo.color,
+                        color: "#000",
+                        weight: 1,
+                        opacity: 1,
+                        fillOpacity: 0.8
+                    });
+
+                    marker.bindTooltip(item.name, { permanent: false, direction: 'top' });
+                    
+                    const popupContent = this.createPopupContent(item, coords);
+                    marker.bindPopup(popupContent);
+
+                    // Add reverse geocoding on popup open
+                    marker.on('popupopen', () => this.handlePopupOpen(marker, coords));
+
+                    this.markerReferences.push({
+                        marker: marker,
+                        status: statusInfo.label,
+                        data: item
+                    });
+                }
+            });
+
+            this.applyMapFilter();
+        }
+
+        createPopupContent(item, coords) {
+            return `
+                <div style="min-width: 200px;">
+                    <h6 style="margin-bottom: 10px; color: #333;"><strong>${item.name}</strong></h6>
+                    <hr style="margin: 8px 0;">
+                    <p style="margin: 4px 0;"><strong>進度:</strong> ${item.progress || '未指定'}</p>
+                    <p style="margin: 4px 0;"><strong>工作單:</strong> ${item.ticket || 'N/A'}</p>
+                    <p style="margin: 4px 0;"><strong>類型:</strong> ${item.type || ''}</p>
+                    <p style="margin: 4px 0;"><strong>歸列局:</strong> ${item.office || 'N/A'}</p>
+                    <p style="margin: 4px 0;"><strong>積點數:</strong> ${item.points || ''}</p>
+                    <p style="margin: 4px 0;"><strong>桿號:</strong> ${item.pole || 'N/A'}</p>
+                    <p style="margin: 4px 0;"><strong>座標:</strong> ${coords.lat.toFixed(5)}, ${coords.lon.toFixed(5)}</p>
+                    <div class="address-info" style="margin: 8px 0; padding: 8px; background: #f8f9fa; border-radius: 4px;">
+                        <strong>地址:</strong> <span class="address-text">查詢中...</span>
+                    </div>
+                    <div style="margin-top: 10px;">
+                        <a href="https://www.google.com/maps/dir/?api=1&destination=${coords.lat},${coords.lon}" 
+                           target="_blank" 
+                           style="color: #667eea; text-decoration: none; font-weight: 500;">
+                            <i class="bi bi-geo-alt"></i> 開啟導航
+                        </a>
+                    </div>
+                </div>
+            `;
+        }
+
+        async handlePopupOpen(marker, coords) {
+            const popup = marker.getPopup();
+            const currentContent = popup.getContent();
+            
+            // Check if address has already been fetched
+            if (!currentContent.includes("查詢中...")) {
+                return;
+            }
+
+            try {
+                const nominatimUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${coords.lat}&lon=${coords.lon}&accept-language=zh-TW`;
+                const response = await fetch(nominatimUrl);
+                const data = await response.json();
+                
+                const address = data.display_name || "無法找到地址";
+                const newContent = currentContent.replace("查詢中...", address);
+                popup.setContent(newContent);
+                
+            } catch (error) {
+                console.error("Reverse geocoding error:", error);
+                const newContent = currentContent.replace("查詢中...", "查詢失敗");
+                popup.setContent(newContent);
+            }
+        }
+
+        addMapControls() {
+            // Search control
+            const searchControl = L.control({position: 'topleft'});
+            searchControl.onAdd = function(map) {
+                const container = L.DomUtil.create('div', 'map-control-item');
+                container.innerHTML = `
+                    <div style="margin-bottom: 8px;">
+                        <label style="font-weight: 500; margin-bottom: 5px; display: block;">
+                            <i class="bi bi-search"></i> 搜尋工程
+                        </label>
+                        <input type="text" id="map-search" class="form-control form-control-sm" 
+                               placeholder="搜尋名稱, 單號, 進度...">
+                    </div>
+                `;
+                L.DomEvent.disableClickPropagation(container);
+                return container;
+            };
+            searchControl.addTo(this.map);
+
+            // Filter control
+            const filterControl = L.control({position: 'topleft'});
+            filterControl.onAdd = function(map) {
+                const container = L.DomUtil.create('div', 'map-control-item');
+                container.innerHTML = `
+                    <div>
+                        <label style="font-weight: 500; margin-bottom: 5px; display: block;">
+                            <i class="bi bi-funnel"></i> 進度篩選
+                        </label>
+                        <select id="map-filter" class="form-select form-select-sm">
+                            <option value="all">顯示全部</option>
+                            <option value="完成">已完工</option>
+                            <option value="進行中">進行中</option>
+                            <option value="自辦/轉辦">自辦/轉辦</option>
+                            <option value="其他">其他</option>
+                        </select>
+                    </div>
+                `;
+                L.DomEvent.disableClickPropagation(container);
+                return container;
+            };
+            filterControl.addTo(this.map);
+
+            // 優化後的統計控制項 - 可收合設計
+            const statsControl = L.control({position: 'bottomright'});
+            statsControl.onAdd = () => {
+                const container = L.DomUtil.create('div', 'map-stats-control');
+                container.innerHTML = `
+                    <div class="stats-header" onclick="window.dashboardInstance.toggleStats()">
+                        <div style="font-weight: 500; font-size: 0.9rem;">
+                            <i class="bi bi-bar-chart"></i> 即時統計
+                        </div>
+                        <button class="stats-toggle" id="stats-toggle-btn">
+                            <i class="bi bi-chevron-up"></i>
+                        </button>
+                    </div>
+                    <div class="stats-content expanded" id="stats-content">
+                        <div class="stats-item">
+                            <span>完成</span>
+                            <strong style="color: var(--success);" id="map-completed-count">0</strong>
+                        </div>
+                        <div class="stats-item">
+                            <span>進行</span>
+                            <strong style="color: var(--warning);" id="map-progress-count">0</strong>
+                        </div>
+                        <div class="stats-item">
+                            <span>轉辦</span>
+                            <strong style="color: var(--danger);" id="map-cancelled-count">0</strong>
+                        </div>
+                        <div class="stats-item">
+                            <span>總計</span>
+                            <strong style="color: var(--secondary);" id="map-total-count">0</strong>
+                        </div>
+                    </div>
+                `;
+                L.DomEvent.disableClickPropagation(container);
+                return container;
+            };
+            statsControl.addTo(this.map);
+
+            // 設置全域參考以便在類別外部訪問
+            window.dashboardInstance = this;
+
+            this.updateMapStats();
+
+            // Event listeners
+            document.getElementById('map-search').addEventListener('keyup', (e) => {
+                this.currentSearchTerm = e.target.value.toLowerCase();
+                this.applyMapFilter();
+            });
+
+            document.getElementById('map-filter').addEventListener('change', (e) => {
+                this.filterMap(e.target.value);
+            });
+        }
+
+        // 新增切換統計面板的方法
+        toggleStats() {
+            const content = document.getElementById('stats-content');
+            const toggleBtn = document.getElementById('stats-toggle-btn');
+            
+            if (this.statsCollapsed) {
+                content.classList.remove('collapsed');
+                content.classList.add('expanded');
+                toggleBtn.innerHTML = '<i class="bi bi-chevron-up"></i>';
+                this.statsCollapsed = false;
+            } else {
+                content.classList.remove('expanded');
+                content.classList.add('collapsed');
+                toggleBtn.innerHTML = '<i class="bi bi-chevron-down"></i>';
+                this.statsCollapsed = true;
+            }
+        }
+
+        updateMapStats() {
+            document.getElementById('map-completed-count').textContent = this.statusCounts['完成'];
+            document.getElementById('map-progress-count').textContent = this.statusCounts['進行中'];
+            document.getElementById('map-cancelled-count').textContent = this.statusCounts['自辦/轉辦'];
+            document.getElementById('map-total-count').textContent = this.repairData.length;
+        }
+
+        filterMap(status) {
+            this.currentStatusFilter = status;
+            this.applyMapFilter();
+            
+            // Update filter dropdown
+            const filterSelect = document.getElementById('map-filter');
+            if (filterSelect) {
+                filterSelect.value = status;
+            }
+        }
+
+        applyMapFilter() {
+            // Remove existing markers
+            this.currentMarkersOnMap.forEach(marker => {
+                this.map.removeLayer(marker);
+            });
+            this.currentMarkersOnMap = [];
+
+            let visibleCount = 0;
+
+            this.markerReferences.forEach(ref => {
+                const statusMatch = this.currentStatusFilter === 'all' || ref.status === this.currentStatusFilter;
+
+                const searchData = [
+                    ref.data.name,
+                    ref.data.ticket,
+                    ref.data.progress,
+                    ref.data.pole
+                ].join(' ').toLowerCase();
+                
+                const searchMatch = this.currentSearchTerm === '' || searchData.includes(this.currentSearchTerm);
+
+                if (statusMatch && searchMatch) {
+                    ref.marker.addTo(this.map);
+                    this.currentMarkersOnMap.push(ref.marker);
+                    visibleCount++;
+                }
+            });
+
+            // Update visible count in search box
+            const searchBox = document.getElementById('map-search');
+            if (searchBox) {
+                searchBox.placeholder = `搜尋工程 (顯示 ${visibleCount} 個)`;
+            }
+        }
+
+        initializeCharts() {
+            this.createProgressChart();
+            this.createLocationChart();
+        }
+
+        createProgressChart() {
+            const ctx = document.getElementById('progressChart').getContext('2d');
+            
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(this.statusCounts),
+                    datasets: [{
+                        data: Object.values(this.statusCounts),
+                        backgroundColor: ['#28a745', '#ffc107', '#dc3545', '#6c757d'],
+                        borderWidth: 3,
+                        borderColor: '#fff',
+                        hoverBorderWidth: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '工程進度分布',
+                            font: { size: 18, weight: 'bold' },
+                            padding: 20
+                        },
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                padding: 20,
+                                font: { size: 14 },
+                                usePointStyle: true
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0,0,0,0.8)',
+                            titleColor: 'white',
+                            bodyColor: 'white',
+                            borderColor: '#667eea',
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function(context) {
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = ((context.parsed / total) * 100).toFixed(1);
+                                    return `${context.label}: ${context.parsed} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    },
+                    animation: {
+                        animateScale: true,
+                        animateRotate: true,
+                        duration: 1500,
+                        easing: 'easeOutQuart'
+                    }
+                }
+            });
+        }
+
+        createLocationChart() {
+            const ctx = document.getElementById('locationChart').getContext('2d');
+            
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: Object.keys(this.locationCounts),
+                    datasets: [{
+                        label: '工程數量',
+                        data: Object.values(this.locationCounts),
+                        backgroundColor: [
+                            'rgba(102, 126, 234, 0.8)',
+                            'rgba(118, 75, 162, 0.8)',
+                            'rgba(255, 193, 7, 0.8)',
+                            'rgba(40, 167, 69, 0.8)',
+                            'rgba(220, 53, 69, 0.8)'
+                        ],
+                        borderColor: [
+                            'rgba(102, 126, 234, 1)',
+                            'rgba(118, 75, 162, 1)',
+                            'rgba(255, 193, 7, 1)',
+                            'rgba(40, 167, 69, 1)',
+                            'rgba(220, 53, 69, 1)'
+                        ],
+                        borderWidth: 2,
+                        borderRadius: 8,
+                        borderSkipped: false,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '各地區工程分布',
+                            font: { size: 18, weight: 'bold' },
+                            padding: 20
+                        },
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0,0,0,0.8)',
+                            titleColor: 'white',
+                            bodyColor: 'white',
+                            borderColor: '#667eea',
+                            borderWidth: 1
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: '工程數量',
+                                font: { size: 14, weight: 'bold' }
+                            },
+                            grid: {
+                                color: 'rgba(0,0,0,0.1)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: '地區',
+                                font: { size: 14, weight: 'bold' }
+                            },
+                            grid: {
+                                display: false
+                            }
+                        }
+                    },
+                    animation: {
+                        duration: 1500,
+                        easing: 'easeOutQuart'
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    }
+                }
+            });
+        }
+
+        initializeTable(headers, lines) {
+            const table = document.getElementById('progressTable');
+            const tableHead = table.querySelector('thead');
+            const tableBody = table.querySelector('tbody');
+
+            tableHead.innerHTML = '';
+            tableBody.innerHTML = '';
+
+            // Create header row
+            let headerRow = '<tr><th>#</th>';
+            headers.forEach((header, index) => {
+                if (index < 6 || index > 18) {
+                    headerRow += `<th>${header}</th>`;
+                }
+            });
+            headerRow += '</tr>';
+            tableHead.innerHTML = headerRow;
+
+            // Create filter row
+            const filterRow = tableHead.querySelector('tr').cloneNode(true);
+            filterRow.classList.add('filters');
+            Array.from(filterRow.querySelectorAll('th')).forEach(th => {
+                const title = th.textContent;
+                th.innerHTML = `<input type="text" class="form-control form-control-sm" placeholder="篩選 ${title}" />`;
+            });
+            tableHead.appendChild(filterRow);
+
+            // Populate data rows
+            lines.forEach((line, lineIndex) => {
+                let row = `<tr><td>${lineIndex + 1}</td>`;
+                line.forEach((cell, index) => {
+                    if (index < 6 || index > 18) {
+                        row += `<td>${cell || ''}</td>`;
+                    }
+                });
+                row += '</tr>';
+                tableBody.innerHTML += row;
+            });
+
+            // Initialize DataTable
+            this.dataTable = $('#progressTable').DataTable({
+                paging: true,
+                pageLength: 25,
+                lengthMenu: [10, 25, 50, 100],
+                language: {
+                    url: "https://cdn.datatables.net/plug-ins/1.13.6/i18n/zh-HANT.json"
+                },
+                orderCellsTop: true,
+                fixedHeader: true,
+                responsive: true,
+                dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
+                     '<"row"<"col-sm-12"tr>>' +
+                     '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
+                initComplete: function() {
+                    const api = this.api();
+                    api.columns().eq(0).each(function(colIdx) {
+                        const input = $('.filters th').eq($(api.column(colIdx).header()).index()).find('input');
+                        input.on('keyup change', function() {
+                            if (api.column(colIdx).search() !== this.value) {
+                                api.column(colIdx).search(this.value).draw();
+                            }
+                        });
+                    });
+                }
+            });
+        }
+    }
+
+    // Initialize dashboard when DOM is ready
+    $(document).ready(function() {
+        new TyphoonDashboard();
+    });
+    </script>
+</body>
+</html>
